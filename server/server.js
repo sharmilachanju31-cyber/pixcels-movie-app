@@ -1,51 +1,36 @@
-const express = require("express");
-const path = require("path");
-
-// Load the movies data from the JSON file
-const movies = require("./movies_metadata.json");
-
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const app = express();
 
-// A test route to make sure the server is up.
-app.get("/api/ping", (request, response) => {
-  console.log("❇️ Received GET request to /api/ping");
-  response.send("pong!");
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../build')));
+
+const moviesPath = path.join(__dirname, 'movies_metadata.json');
+let movies = JSON.parse(fs.readFileSync(moviesPath, 'utf8'));
+
+// GET all movies
+app.get('/api/movies', (req, res) => {
+  res.json(movies);
 });
 
-// Route 1: Return ALL movies (only the fields needed for the list page)
-app.get("/api/movies", (request, response) => {
-  console.log("❇️ Received GET request to /api/movies");
-  response.json({ data: movies });
+// POST new movie
+app.post('/api/movies', (req, res) => {
+  const newMovie = { 
+    id: Date.now(), 
+    title: req.body.title,
+    genre: req.body.genre,
+    year: parseInt(req.body.year),
+    rating: parseFloat(req.body.rating)
+  };
+  movies.push(newMovie);
+  fs.writeFileSync(moviesPath, JSON.stringify(movies, null, 2));
+  res.status(201).json(newMovie);
 });
 
-// Route 2: Return a SINGLE movie by ID (for the detail page)
-app.get("/api/movies/:id", (request, response) => {
-  console.log("❇️ Received GET request to /api/movies/:id");
-  const movie = movies.find(m => String(m.id) === request.params.id);
-  if (!movie) {
-    return response.status(404).json({ error: "Movie not found" });
-  }
-  response.json({ data: movie });
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../build/index.html'));
 });
 
-// Express port-switching logic
-let port;
-console.log("❇️ NODE_ENV is", process.env.NODE_ENV);
-if (process.env.NODE_ENV === "production") {
-  port = process.env.PORT || 3000;
-  app.use(express.static(path.join(__dirname, "../build")));
-  app.get("*", (request, response) => {
-    response.sendFile(path.join(__dirname, "../build", "index.html"));
-  });
-} else {
-  port = 3001;
-  console.log("⚠️ Not seeing your changes as you develop?");
-  console.log(
-    "⚠️ Do you need to set 'start': 'npm run development' in package.json?"
-  );
-}
-
-// Start the listener!
-const listener = app.listen(port, () => {
-  console.log("❇️ Express server is running on port", listener.address().port);
-});
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
